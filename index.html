@@ -1,0 +1,75 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#FFC72C">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="apple-mobile-web-app-title" content="Walk Tracker">
+<meta name="robots" content="noindex">
+<title>Walk Tracker</title>
+<link rel="manifest" href="manifest.json">
+<link rel="icon" href="icon-192.png">
+<link rel="apple-touch-icon" href="apple-touch-icon.png">
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin="">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<header id="top">
+  <div class="row">
+    <select id="walkSel" aria-label="Choose walk"></select>
+    <button id="menuBtn" class="iconbtn" aria-label="Menu">&#9776;</button>
+  </div>
+  <div id="progress" class="progress"></div>
+  <div class="tabs">
+    <button id="tabMap" class="tab active">Map</button>
+    <button id="tabList" class="tab">List</button>
+  </div>
+</header>
+
+<main>
+  <div id="map"></div>
+  <div id="list" hidden></div>
+  <button id="locBtn" class="fab" aria-label="Locate me">&#9678; Locate me</button>
+  <div id="empty" class="empty" hidden>
+    <p><b>No walks loaded yet.</b></p>
+    <p>Tap <b>Import walk list</b> and pick the walk CSV file you were sent.</p>
+    <button class="big primary" id="emptyImport">Import walk list</button>
+  </div>
+</main>
+
+<div id="menu" class="menu" hidden>
+  <button class="big" id="importBtn">Import walk list</button>
+  <button class="big" id="exportBtn">Export CSV</button>
+  <button class="big ghost" id="menuClose">Close</button>
+  <p class="small" id="storeInfo"></p>
+</div>
+<input type="file" id="fileIn" accept=".csv,text/csv,text/plain" hidden>
+
+<div id="sheetBg" class="sheetbg" hidden></div>
+<section id="sheet" class="sheet" hidden aria-modal="true" role="dialog">
+  <div class="sheethead">
+    <div>
+      <div class="stopno" id="shStop"></div>
+      <div class="addr" id="shAddr"></div>
+      <div class="small" id="shMeta"></div>
+    </div>
+    <button class="iconbtn" id="shClose" aria-label="Close">&#10005;</button>
+  </div>
+  <div class="statusgrid" id="shStatuses"></div>
+  <textarea id="shNote" rows="3" placeholder="Notes (name, roof age, best time, phone...)"></textarea>
+  <div class="sheetfoot">
+    <button class="big ghost" id="shPrev">&#9664; Prev</button>
+    <button class="big primary" id="shSave">Save</button>
+    <button class="big ghost" id="shNext">Next &#9654;</button>
+  </div>
+  <div class="small" id="shLast"></div>
+</section>
+<div id="toast" class="toast" hidden></div>
+
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
+<script src="app.js"></script>
+</body>
+</html>
