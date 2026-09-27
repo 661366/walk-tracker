@@ -60,28 +60,51 @@
   }
   function csvCell(v) { v = String(v == null ? '' : v); return /[",\n\r]/.test(v) ? '"' + v.replace(/"/g, '""') + '"' : v; }
 
+  var EXTRA = ['owner_name', 'year_built', 'sqft', 'stories', 'est_value', 'last_sale_date', 'roof_note', 'pin', 'data_source'];
   function importRows(rows) {
     var need = ['lead_id', 'date', 'route_seq', 'walk', 'address', 'latitude', 'longitude'];
     if (!rows.length) throw new Error('File has no rows.');
     var missing = need.filter(function (k) { return !(k in rows[0]); });
     if (missing.length) throw new Error('Missing column(s): ' + missing.join(', '));
-    var added = 0, updated = 0, skipped = 0;
+    var added = 0, updated = 0, skipped = 0, enriched = 0;
     rows.forEach(function (r) {
       var lat = parseFloat(r.latitude), lon = parseFloat(r.longitude);
       if (!r.lead_id || !r.date || !r.walk || isNaN(lat) || isNaN(lon)) { skipped++; return; }
+      var old = stops[r.lead_id] || {};
       var s = {
         lead_id: r.lead_id, date: r.date, walk: r.walk, route_seq: parseInt(r.route_seq, 10) || 0,
         address: r.address, zip: r.zip || '', neighborhood: r.neighborhood || '', lat: lat, lon: lon
       };
+      // Home/owner details: a non-blank value in the file fills or updates; blank or missing keeps what is already on the phone.
+      EXTRA.forEach(function (k) { var v = (r[k] || '').trim(); s[k] = v !== '' ? v : (old[k] || ''); });
+      if (s.owner_name || s.year_built) enriched++;
       if (stops[r.lead_id]) updated++; else added++;
       stops[r.lead_id] = s;                 // stop details replaced; statuses untouched
     });
     save(STOPS_KEY, stops);
-    return { added: added, updated: updated, skipped: skipped };
+    return { added: added, updated: updated, skipped: skipped, enriched: enriched };
+  }
+  function fmtNum(v) { var n = parseInt(String(v).replace(/[^0-9]/g, ''), 10); return isNaN(n) ? '' : n.toLocaleString('en-US'); }
+  function fmtValue(v) {
+    var n = parseInt(String(v).replace(/[^0-9]/g, ''), 10); if (isNaN(n) || !n) return '';
+    return n >= 1e6 ? '$' + (n / 1e6).toFixed(n >= 1e7 ? 0 : 1).replace(/\.0$/, '') + 'M' : '$' + Math.round(n / 1000) + 'k';
+  }
+  function fmtStories(v) {
+    v = String(v || '').trim(); if (!v) return '';
+    return /^[0-9.]+$/.test(v) ? v + (v === '1' ? ' story' : ' stories') : v;
+  }
+  function detailsLine(s) {
+    var p = [];
+    if (s.year_built) p.push('Built ' + s.year_built);
+    if (fmtNum(s.sqft)) p.push(fmtNum(s.sqft) + ' sq ft');
+    if (fmtStories(s.stories)) p.push(fmtStories(s.stories));
+    if (fmtValue(s.est_value)) p.push('Est. value ' + fmtValue(s.est_value));
+    if (s.last_sale_date) p.push('Last sale ' + String(s.last_sale_date).slice(0, 4));
+    return p.join(' · ');
   }
 
   function exportCSV() {
-    var cols = ['lead_id', 'date', 'walk', 'route_seq', 'address', 'zip', 'neighborhood', 'latitude', 'longitude', 'status', 'notes', 'updated_at', 'history'];
+    var cols = ['lead_id', 'date', 'walk', 'route_seq', 'address', 'zip', 'neighborhood', 'latitude', 'longitude', 'status', 'notes', 'updated_at', 'history'].concat(EXTRA);
     var ids = Object.keys(stops).concat(Object.keys(status).filter(function (k) { return !stops[k]; }));
     ids.sort(function (a, b) {
       var x = stops[a] || {}, y = stops[b] || {};
@@ -92,7 +115,7 @@
       var s = stops[id] || { lead_id: id }, st = status[id] || {};
       var hist = (st.history || []).map(function (h) { return h.ts + ' ' + (ST[h.status] ? ST[h.status].label : h.status || '-'); }).join(' | ');
       lines.push([id, s.date, s.walk, s.route_seq, s.address, s.zip, s.neighborhood, s.lat, s.lon,
-        st.status ? ST[st.status].label : '', st.note || '', st.ts || '', hist].map(csvCell).join(','));
+        st.status ? ST[st.status].label : '', st.note || '', st.ts || '', hist].concat(EXTRA.map(function (k) { return s[k] || ''; })).map(csvCell).join(','));
     });
     var name = 'walk-results_' + today() + '.csv';
     var blob = new Blob([lines.join('\r\n') + '\r\n'], { type: 'text/csv' });
@@ -177,7 +200,7 @@
       var st = status[s.lead_id] || {}, c = st.status ? ST[st.status] : null;
       var style = c ? 'background:' + c.color + ';color:' + c.fg : '';
       return '<button class="item" data-i="' + i + '"><span class="num" style="' + style + '">' + (i + 1) + '</span><span class="txt">' +
-        '<div class="a">' + esc(s.address) + '</div><div class="s">' + (c ? esc(c.label) + ' · ' + esc((st.ts || '').slice(11, 16)) : 'Not knocked') +
+        '<div class="a">' + esc(s.address) + '</div>' + (s.owner_name ? '<div class="o">' + esc(s.owner_name) + '</div>' : '') + '<div class="s">' + (c ? esc(c.label) + ' · ' + esc((st.ts || '').slice(11, 16)) : 'Not knocked') +
         (i === 0 ? ' · START' : i === curList.length - 1 ? ' · END' : '') + '</div>' +
         (st.note ? '<div class="n">' + esc(st.note) + '</div>' : '') + '</span></button>';
     }).join('');
@@ -195,6 +218,11 @@
     pick = st.status || null;
     $('shStop').textContent = 'Stop ' + (i + 1) + ' of ' + curList.length + (i === 0 ? ' · START' : i === curList.length - 1 ? ' · END' : '');
     $('shAddr').textContent = s.address;
+    $('shOwner').textContent = s.owner_name || ''; $('shOwner').hidden = !s.owner_name;
+    var dl = detailsLine(s);
+    $('shDetails').textContent = dl; $('shRoof').textContent = s.roof_note || '';
+    $('shPR').hidden = !(dl || s.owner_name || s.roof_note);
+    $('shRec').hidden = !(dl || s.roof_note);
     $('shMeta').textContent = [s.zip, (s.neighborhood || '').split(':')[0]].filter(Boolean).join(' · ');
     $('shNote').value = st.note || '';
     $('shLast').textContent = st.ts ? 'Last saved ' + st.ts + (st.history && st.history.length > 1 ? ' · ' + st.history.length + ' saves' : '') : 'Not saved yet';
@@ -269,7 +297,7 @@
       try {
         var res = importRows(parseCSV(String(r.result)));
         fillWalks();
-        toast('Imported: ' + res.added + ' new, ' + res.updated + ' updated' + (res.skipped ? ', ' + res.skipped + ' skipped (no walk/date)' : '') + '. Results kept.', 4000);
+        toast('Imported: ' + res.added + ' new, ' + res.updated + ' updated' + (res.enriched ? ', ' + res.enriched + ' with owner/home info' : '') + (res.skipped ? ', ' + res.skipped + ' skipped (no walk/date)' : '') + '. Results kept.', 4000);
       } catch (e) { toast('Import failed: ' + e.message, 5000); }
     };
     r.readAsText(f);

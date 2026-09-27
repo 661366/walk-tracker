@@ -1,4 +1,4 @@
-var SHELL = 'wt-shell-v1', TILES = 'wt-tiles-v1';
+var SHELL = 'wt-shell-v2', TILES = 'wt-tiles-v1';
 var FILES = ['./', 'index.html', 'style.css', 'app.js', 'manifest.json', 'https://unpkg.com/leaflet@1.9.4/dist/leaflet.js', 'https://unpkg.com/leaflet@1.9.4/dist/leaflet.css', 'icon-192.png', 'icon-512.png', 'apple-touch-icon.png'];
 self.addEventListener('install', function (e) { e.waitUntil(caches.open(SHELL).then(function (c) { return c.addAll(FILES); }).then(function () { return self.skipWaiting(); })); });
 self.addEventListener('activate', function (e) {
